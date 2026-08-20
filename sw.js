@@ -1,4 +1,4 @@
-const CACHE_NAME = "prompt-roulette-v0.2.0";
+const CACHE_NAME = "prompt-roulette-v0.3.0";
 const APP_SHELL = ["./", "./index.html", "./styles.css", "./prompts.js", "./core.js", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
