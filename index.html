@@ -28,7 +28,7 @@
           お題一覧
           <span class="library-button__count" id="headerPromptCount">108</span>
         </button>
-        <span class="version" id="versionLabel">v0.2.0</span>
+          <span class="version" id="versionLabel">v0.3.0</span>
       </div>
     </header>
 
@@ -100,6 +100,25 @@
 
         <details class="setting-block">
           <summary>
+            <span>表示名の置き換え</span>
+            <span class="summary-note" id="userNameSummary">未設定</span>
+          </summary>
+          <div class="setting-content">
+            <p class="setting-help">お題にある「ユーザー」を、好きな表示名へ置き換えます。入力内容はこの端末だけに保存されます。</p>
+            <label class="stacked-field" for="userNameInput">
+              <span>表示名</span>
+              <input id="userNameInput" type="text" maxlength="40" placeholder="例：あなたの名前" autocomplete="off" />
+            </label>
+            <div class="setting-actions">
+              <button class="compact-primary-button" id="saveUserNameButton" type="button">表示名を保存</button>
+              <button class="text-button" id="clearUserNameButton" type="button">置き換えを解除</button>
+            </div>
+            <p class="inline-setting-status" id="userNameSaveState" role="status"></p>
+          </div>
+        </details>
+
+        <details class="setting-block">
+          <summary>
             <span>コピー文テンプレート</span>
             <span class="summary-note" id="templateSummaryState">保存済み</span>
           </summary>
@@ -111,12 +130,61 @@
               <button class="token-button" type="button" data-template-token="{{prompt}}">お題本文</button>
               <button class="token-button" type="button" data-template-token="{{modifiers}}">補助条件</button>
               <button class="token-button" type="button" data-template-token="{{tags}}">タグ</button>
+              <button class="token-button" type="button" data-template-token="{{user}}">表示名</button>
             </div>
             <div class="setting-actions">
               <button class="compact-primary-button" id="saveCopyTemplateButton" type="button">テンプレートを保存</button>
               <button class="text-button" id="resetCopyTemplateButton" type="button">初期文に戻す</button>
             </div>
             <p class="inline-setting-status" id="templateSaveState" role="status"></p>
+          </div>
+        </details>
+
+        <details class="setting-block">
+          <summary>
+            <span>お題データ管理</span>
+            <span class="summary-note" id="customDataCount">追加 0件</span>
+          </summary>
+          <div class="setting-content data-manager">
+            <p class="setting-help">追加したデータも抽選・一覧・地雷判定へすぐ反映します。この端末だけに保存されます。</p>
+
+            <form class="registration-form" id="customPromptForm">
+              <h3>メインお題を追加</h3>
+              <label class="stacked-field">
+                <span>種類</span>
+                <select id="customPromptCategory"></select>
+              </label>
+              <label class="stacked-field">
+                <span>お題本文</span>
+                <textarea id="customPromptText" rows="3" maxlength="500" required placeholder="新しいお題を入力"></textarea>
+              </label>
+              <label class="stacked-field">
+                <span>タグ（カンマ区切り・任意）</span>
+                <input id="customPromptTags" type="text" maxlength="200" placeholder="日常, 甘め" />
+              </label>
+              <button class="compact-primary-button" type="submit">メインお題を登録</button>
+            </form>
+
+            <form class="registration-form" id="customModifierForm">
+              <h3>補助条件を追加</h3>
+              <label class="stacked-field">
+                <span>条件の種類</span>
+                <select id="customModifierType"></select>
+              </label>
+              <label class="stacked-field">
+                <span>条件本文</span>
+                <input id="customModifierValue" type="text" maxlength="200" required placeholder="新しい補助条件を入力" />
+              </label>
+              <button class="compact-primary-button" type="submit">補助条件を登録</button>
+            </form>
+
+            <p class="inline-setting-status" id="dataManagerState" role="status"></p>
+            <div class="data-export-actions">
+              <button class="library-action-button" id="exportTextButton" type="button">一覧をTXT出力</button>
+              <button class="library-action-button" id="exportJsonButton" type="button">JSONバックアップ</button>
+              <button class="library-action-button" id="importJsonButton" type="button">JSONから復元</button>
+              <input id="importJsonInput" type="file" accept="application/json,.json" hidden />
+            </div>
           </div>
         </details>
 
@@ -180,18 +248,22 @@
       <div class="prompt-library__shell">
         <header class="prompt-library__header">
           <div>
-            <span class="eyebrow">ALL MAIN PROMPTS</span>
-            <h2 id="promptLibraryTitle">登録お題一覧</h2>
+            <span class="eyebrow" id="promptLibraryEyebrow">ALL MAIN PROMPTS</span>
+            <h2 id="promptLibraryTitle">登録データ一覧</h2>
           </div>
           <button class="dialog-close-button" id="closePromptLibraryButton" type="button" aria-label="お題一覧を閉じる">×</button>
         </header>
+        <div class="library-tabs" role="tablist" aria-label="一覧の種類">
+          <button class="library-tab is-active" id="promptLibraryPromptTab" type="button" role="tab" aria-selected="true" data-library-mode="prompts">メインお題 <span id="libraryPromptTabCount">108</span></button>
+          <button class="library-tab" id="promptLibraryModifierTab" type="button" role="tab" aria-selected="false" data-library-mode="modifiers">補助条件 <span id="libraryModifierTabCount">98</span></button>
+        </div>
         <div class="prompt-library__filters">
           <label class="library-field library-field--search">
             <span>検索</span>
             <input id="promptLibrarySearch" type="search" placeholder="本文・タグから検索" autocomplete="off" />
           </label>
           <label class="library-field">
-            <span>分類</span>
+            <span id="promptLibraryCategoryLabel">分類</span>
             <select id="promptLibraryCategory">
               <option value="all">すべて</option>
             </select>
@@ -224,7 +296,14 @@
           <span class="modifier-card__label"></span>
           <p class="modifier-card__value"></p>
         </div>
-        <button class="icon-button modifier-card__reroll" type="button" aria-label="この補助条件だけ引き直す" title="この条件だけ引き直す">↻</button>
+        <div class="modifier-card__actions">
+          <label class="copy-switch" title="コピーへの反映を切り替える">
+            <input class="modifier-card__copy-toggle" type="checkbox" checked />
+            <span aria-hidden="true"></span>
+            <small class="modifier-card__copy-state">コピーON</small>
+          </label>
+          <button class="icon-button modifier-card__reroll" type="button" aria-label="この補助条件だけ引き直す" title="この条件だけ引き直す">↻</button>
+        </div>
       </article>
     </template>
 
