@@ -1,0 +1,19 @@
+{
+  "name": "Prompt Roulette",
+  "short_name": "Roulette",
+  "description": "恋愛ロール向けのお題と補助条件をランダムに組み合わせるルーレット",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f3ef",
+  "theme_color": "#f7f3ef",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
