@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Prompt Roulette">
+  <rect width="512" height="512" rx="112" fill="#f7f3ef"/>
+  <circle cx="256" cy="256" r="172" fill="#fffdfb" stroke="#95506a" stroke-width="18"/>
+  <circle cx="256" cy="256" r="126" fill="none" stroke="#ead8df" stroke-width="42" stroke-dasharray="82 24"/>
+  <path d="M256 159c-38-51-112-23-103 40 7 47 58 79 103 121 45-42 96-74 103-121 9-63-65-91-103-40Z" fill="#95506a"/>
+  <circle cx="256" cy="256" r="18" fill="#f7f3ef"/>
+</svg>
