@@ -1156,15 +1156,20 @@
       elements.dataManagerState.textContent = "同じ種類に、同じ本文のお題がすでにあります。";
       return;
     }
-    state.customData.prompts.push({
+    const item = {
       id: makeId("custom-prompt"),
       category,
       text,
       tags: normalizeTags(elements.customPromptTags.value.split(/[、,]/)),
       custom: true,
       createdAt: new Date().toISOString()
-    });
-    persistCustomData();
+    };
+    state.customData.prompts.push(item);
+    if (!persistCustomData()) {
+      state.customData.prompts.pop();
+      elements.dataManagerState.textContent = "端末の保存容量が足りず、登録できませんでした。JSONバックアップ後に件数を整理してください。";
+      return;
+    }
     elements.customPromptForm.reset();
     renderAfterDataChange();
     elements.dataManagerState.textContent = "メインお題を登録しました。";
@@ -1183,14 +1188,19 @@
       elements.dataManagerState.textContent = "同じ種類に、同じ補助条件がすでにあります。";
       return;
     }
-    state.customData.modifiers.push({
+    const item = {
       id: makeId("custom-modifier"),
       typeId,
       value,
       custom: true,
       createdAt: new Date().toISOString()
-    });
-    persistCustomData();
+    };
+    state.customData.modifiers.push(item);
+    if (!persistCustomData()) {
+      state.customData.modifiers.pop();
+      elements.dataManagerState.textContent = "端末の保存容量が足りず、登録できませんでした。JSONバックアップ後に件数を整理してください。";
+      return;
+    }
     elements.customModifierForm.reset();
     renderAfterDataChange();
     elements.dataManagerState.textContent = "補助条件を登録しました。";
@@ -1284,20 +1294,23 @@
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+    const previous = structuredCloneSafe(state.customData);
     try {
       const backup = JSON.parse(await file.text());
       if (backup?.format !== "prompt-roulette-export" || !backup.customData) throw new Error("invalid-format");
-      const previous = structuredCloneSafe(state.customData);
       state.customData = backup.customData;
       normalizeCustomData();
       const imported = state.customData;
       state.customData = mergeCustomData(previous, imported);
-      persistCustomData();
+      if (!persistCustomData()) throw new Error("storage-full");
       renderAfterDataChange();
       elements.dataManagerState.textContent = `JSONから復元しました（メイン ${imported.prompts.length}件・補助 ${imported.modifiers.length}件）。`;
       showStatus("バックアップから追加データを復元した。", 2200);
     } catch (error) {
-      elements.dataManagerState.textContent = "このファイルはPrompt Rouletteのバックアップとして読み込めません。";
+      state.customData = previous;
+      elements.dataManagerState.textContent = error?.message === "storage-full"
+        ? "端末の保存容量が足りず、復元できませんでした。"
+        : "このファイルはPrompt Rouletteのバックアップとして読み込めません。";
     }
   }
 
@@ -1380,13 +1393,15 @@
   function persistList(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
+      return true;
     } catch (error) {
       // 保存できない環境でも、開いている間の抽選は続けられる。
+      return false;
     }
   }
 
   function persistCustomData() {
-    persistList(storageKeys.customData, state.customData);
+    return persistList(storageKeys.customData, state.customData);
   }
 
   function loadJson(key, fallback) {
