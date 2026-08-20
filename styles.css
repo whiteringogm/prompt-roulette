@@ -412,6 +412,74 @@ summary:focus-visible {
   height: 34px;
 }
 
+.modifier-card.is-copy-off {
+  opacity: 0.62;
+  border-style: dashed;
+}
+
+.modifier-card__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.copy-switch {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.copy-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.copy-switch > span {
+  position: relative;
+  width: 38px;
+  height: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: rgba(83, 72, 79, 0.12);
+  transition: 160ms ease;
+}
+
+.copy-switch > span::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--muted);
+  content: "";
+  transition: 160ms ease;
+}
+
+.copy-switch input:checked + span {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.copy-switch input:checked + span::after {
+  transform: translateX(16px);
+  background: #fff;
+}
+
+.copy-switch input:focus-visible + span {
+  outline: 2px solid var(--accent-dark);
+  outline-offset: 2px;
+}
+
+.copy-switch small {
+  color: var(--muted);
+  font-size: 0.55rem;
+  white-space: nowrap;
+}
+
 .primary-actions {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(150px, 0.65fr);
@@ -582,6 +650,71 @@ summary:focus-visible {
   color: var(--muted);
   font-size: 0.7rem;
   line-height: 1.65;
+}
+
+.stacked-field {
+  display: grid;
+  gap: 6px;
+}
+
+.stacked-field > span {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.stacked-field input,
+.stacked-field select,
+.stacked-field textarea {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 11px;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.56);
+  font: inherit;
+  font-size: 0.75rem;
+}
+
+.stacked-field textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.data-manager {
+  display: grid;
+  gap: 14px;
+}
+
+.registration-form {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.registration-form h3 {
+  margin: 0 0 2px;
+  font-family: var(--font-serif);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.registration-form .compact-primary-button {
+  justify-self: start;
+}
+
+.data-export-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.data-export-actions .library-action-button:last-of-type {
+  grid-column: 1 / -1;
 }
 
 .settings-textarea {
@@ -945,8 +1078,55 @@ summary:focus-visible {
 
 .prompt-library__shell {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto minmax(0, 1fr);
   max-height: min(88vh, 900px);
+}
+
+.library-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 14px 26px 0;
+}
+
+.library-tab {
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.7rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.library-tab span {
+  margin-left: 4px;
+  opacity: 0.76;
+}
+
+.library-tab.is-active {
+  border-color: var(--accent);
+  color: #fff;
+  background: var(--accent);
+}
+
+.library-custom-badge {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--accent-dark);
+  background: var(--accent-wash);
+  font-size: 0.63rem;
+  font-weight: 700;
+}
+
+.library-action-button--danger:hover:not(:disabled) {
+  border-color: #a8544b;
+  color: #a8544b;
+  background: rgba(168, 84, 75, 0.08);
 }
 
 .prompt-library__header {
@@ -1318,6 +1498,10 @@ body.dialog-open {
     padding: 18px 17px 14px;
   }
 
+  .library-tabs {
+    padding: 11px 17px 0;
+  }
+
   .prompt-library__filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     padding: 13px 17px 10px;
@@ -1342,6 +1526,10 @@ body.dialog-open {
   .library-item__actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modifier-card__actions {
+    gap: 7px;
   }
 
   .library-action-button {
@@ -1406,6 +1594,10 @@ body.dialog-open {
   .check-item label,
   .saved-item,
   .settings-textarea,
+  .stacked-field input,
+  .stacked-field select,
+  .stacked-field textarea,
+  .registration-form,
   .exact-block-item,
   .dialog-close-button,
   .library-field input,
