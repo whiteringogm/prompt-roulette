@@ -22,7 +22,14 @@
           <span class="brand-title">Prompt Roulette</span>
         </span>
       </a>
-      <span class="version" id="versionLabel">v0.1.0</span>
+      <div class="header-actions">
+        <button class="library-button" id="openPromptLibraryButton" type="button">
+          <span aria-hidden="true">☷</span>
+          お題一覧
+          <span class="library-button__count" id="headerPromptCount">108</span>
+        </button>
+        <span class="version" id="versionLabel">v0.2.0</span>
+      </div>
     </header>
 
     <main class="shell main-layout">
@@ -91,6 +98,49 @@
           </div>
         </details>
 
+        <details class="setting-block">
+          <summary>
+            <span>コピー文テンプレート</span>
+            <span class="summary-note" id="templateSummaryState">保存済み</span>
+          </summary>
+          <div class="setting-content">
+            <p class="setting-help">呼びかけや前置きを含め、コピーする文章全体を編集できます。差し込み記号は残してください。</p>
+            <textarea class="settings-textarea settings-textarea--template" id="copyTemplateInput" rows="10" aria-label="コピー文テンプレート"></textarea>
+            <div class="token-row" aria-label="差し込み記号">
+              <button class="token-button" type="button" data-template-token="{{category}}">分類</button>
+              <button class="token-button" type="button" data-template-token="{{prompt}}">お題本文</button>
+              <button class="token-button" type="button" data-template-token="{{modifiers}}">補助条件</button>
+              <button class="token-button" type="button" data-template-token="{{tags}}">タグ</button>
+            </div>
+            <div class="setting-actions">
+              <button class="compact-primary-button" id="saveCopyTemplateButton" type="button">テンプレートを保存</button>
+              <button class="text-button" id="resetCopyTemplateButton" type="button">初期文に戻す</button>
+            </div>
+            <p class="inline-setting-status" id="templateSaveState" role="status"></p>
+          </div>
+        </details>
+
+        <details class="setting-block">
+          <summary>
+            <span>地雷リスト</span>
+            <span class="summary-note" id="blockSummaryCount">0件</span>
+          </summary>
+          <div class="setting-content">
+            <p class="setting-help">苦手な語句を一行に一つ入力。本文・タグ・分類名・補助条件に含まれる候補を抽選から外します。</p>
+            <textarea class="settings-textarea" id="blockedTermsInput" rows="6" aria-label="地雷ワード" placeholder="一行に一語ずつ"></textarea>
+            <p class="block-stats" id="blockStats"></p>
+            <div class="setting-actions">
+              <button class="compact-primary-button" id="saveBlockedTermsButton" type="button">地雷ワードを保存</button>
+              <button class="text-button" id="clearBlockListButton" type="button">すべて解除</button>
+            </div>
+            <p class="inline-setting-status" id="blockSaveState" role="status"></p>
+            <div class="exact-blocks">
+              <span class="exact-blocks__label">個別に除外したお題</span>
+              <div class="exact-block-list" id="blockedPromptList"></div>
+            </div>
+          </div>
+        </details>
+
         <details class="setting-block" open>
           <summary>
             <span>補助条件</span>
@@ -126,9 +176,46 @@
       </aside>
     </main>
 
+    <dialog class="prompt-library" id="promptLibraryDialog" aria-labelledby="promptLibraryTitle">
+      <div class="prompt-library__shell">
+        <header class="prompt-library__header">
+          <div>
+            <span class="eyebrow">ALL MAIN PROMPTS</span>
+            <h2 id="promptLibraryTitle">登録お題一覧</h2>
+          </div>
+          <button class="dialog-close-button" id="closePromptLibraryButton" type="button" aria-label="お題一覧を閉じる">×</button>
+        </header>
+        <div class="prompt-library__filters">
+          <label class="library-field library-field--search">
+            <span>検索</span>
+            <input id="promptLibrarySearch" type="search" placeholder="本文・タグから検索" autocomplete="off" />
+          </label>
+          <label class="library-field">
+            <span>分類</span>
+            <select id="promptLibraryCategory">
+              <option value="all">すべて</option>
+            </select>
+          </label>
+          <label class="library-field">
+            <span>地雷状態</span>
+            <select id="promptLibraryStatus">
+              <option value="all">すべて</option>
+              <option value="eligible">地雷なし</option>
+              <option value="blocked">除外中</option>
+            </select>
+          </label>
+        </div>
+        <div class="prompt-library__result-bar">
+          <span id="promptLibraryResultCount">108件</span>
+          <span id="promptLibraryMessage" role="status"></span>
+        </div>
+        <div class="prompt-library__list" id="promptLibraryList"></div>
+      </div>
+    </dialog>
+
     <footer class="site-footer shell">
       <p>ひとつの主題に、少しだけ偶然を。</p>
-      <p>端末内にのみ設定・履歴・お気に入りを保存します。</p>
+      <p>端末内にのみ設定・履歴・お気に入り・地雷リストを保存します。</p>
     </footer>
 
     <template id="modifierTemplate">
@@ -142,6 +229,7 @@
     </template>
 
     <script src="prompts.js"></script>
+    <script src="core.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
