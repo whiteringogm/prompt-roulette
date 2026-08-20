@@ -16,17 +16,17 @@
   const storageKeys = {
     settings: "prompt-roulette:settings",
     history: "prompt-roulette:history",
-    favorites: "prompt-roulette:favorites"
+    favorites: "prompt-roulette:favorites",
+    customData: "prompt-roulette:custom-data"
   };
 
   const categoryMap = new Map(data.categories.map((category) => [category.id, category]));
-  const modifierMap = new Map(data.modifiers.map((modifier) => [modifier.id, modifier]));
-  const promptMap = new Map(data.prompts.map((prompt) => [prompt.id, prompt]));
 
   const defaults = {
     categories: data.categories.map((category) => category.id),
     modifiers: data.modifiers.map((modifier) => modifier.id),
     modifierCount: 4,
+    userName: "",
     copyTemplate: DEFAULT_COPY_TEMPLATE,
     blockedTerms: [],
     blockedPromptIds: []
@@ -36,7 +36,9 @@
     settings: loadJson(storageKeys.settings, defaults),
     history: loadJson(storageKeys.history, []),
     favorites: loadJson(storageKeys.favorites, []),
+    customData: loadJson(storageKeys.customData, { prompts: [], modifiers: [] }),
     current: null,
+    libraryMode: "prompts",
     statusTimer: null,
     libraryMessageTimer: null
   };
@@ -66,6 +68,11 @@
     selectAllCategories: document.querySelector("#selectAllCategories"),
     clearCategories: document.querySelector("#clearCategories"),
     copyTemplateInput: document.querySelector("#copyTemplateInput"),
+    userNameInput: document.querySelector("#userNameInput"),
+    saveUserNameButton: document.querySelector("#saveUserNameButton"),
+    clearUserNameButton: document.querySelector("#clearUserNameButton"),
+    userNameSummary: document.querySelector("#userNameSummary"),
+    userNameSaveState: document.querySelector("#userNameSaveState"),
     saveCopyTemplateButton: document.querySelector("#saveCopyTemplateButton"),
     resetCopyTemplateButton: document.querySelector("#resetCopyTemplateButton"),
     templateSummaryState: document.querySelector("#templateSummaryState"),
@@ -82,10 +89,29 @@
     favoriteList: document.querySelector("#favoriteList"),
     favoriteCount: document.querySelector("#favoriteCount"),
     resetSettingsButton: document.querySelector("#resetSettingsButton"),
+    customDataCount: document.querySelector("#customDataCount"),
+    customPromptForm: document.querySelector("#customPromptForm"),
+    customPromptCategory: document.querySelector("#customPromptCategory"),
+    customPromptText: document.querySelector("#customPromptText"),
+    customPromptTags: document.querySelector("#customPromptTags"),
+    customModifierForm: document.querySelector("#customModifierForm"),
+    customModifierType: document.querySelector("#customModifierType"),
+    customModifierValue: document.querySelector("#customModifierValue"),
+    dataManagerState: document.querySelector("#dataManagerState"),
+    exportTextButton: document.querySelector("#exportTextButton"),
+    exportJsonButton: document.querySelector("#exportJsonButton"),
+    importJsonButton: document.querySelector("#importJsonButton"),
+    importJsonInput: document.querySelector("#importJsonInput"),
     modifierTemplate: document.querySelector("#modifierTemplate"),
     openPromptLibraryButton: document.querySelector("#openPromptLibraryButton"),
     closePromptLibraryButton: document.querySelector("#closePromptLibraryButton"),
     promptLibraryDialog: document.querySelector("#promptLibraryDialog"),
+    promptLibraryEyebrow: document.querySelector("#promptLibraryEyebrow"),
+    promptLibraryPromptTab: document.querySelector("#promptLibraryPromptTab"),
+    promptLibraryModifierTab: document.querySelector("#promptLibraryModifierTab"),
+    libraryPromptTabCount: document.querySelector("#libraryPromptTabCount"),
+    libraryModifierTabCount: document.querySelector("#libraryModifierTabCount"),
+    promptLibraryCategoryLabel: document.querySelector("#promptLibraryCategoryLabel"),
     promptLibrarySearch: document.querySelector("#promptLibrarySearch"),
     promptLibraryCategory: document.querySelector("#promptLibraryCategory"),
     promptLibraryStatus: document.querySelector("#promptLibraryStatus"),
@@ -98,12 +124,13 @@
 
   function init() {
     elements.versionLabel.textContent = `v${data.version}`;
-    elements.headerPromptCount.textContent = data.prompts.length;
-    elements.dataCount.textContent = `${data.prompts.length} MAIN / ${countModifierValues()} EXTRA`;
     elements.copyTemplateInput.value = state.settings.copyTemplate;
+    elements.userNameInput.value = state.settings.userName;
     elements.blockedTermsInput.value = state.settings.blockedTerms.join("\n");
+    renderDataCounts();
     renderCategoryFilters();
     renderModifierFilters();
+    renderRegistrationOptions();
     renderPromptLibraryCategories();
     syncSettingsUi();
     renderBlockSettings();
@@ -116,7 +143,8 @@
   function normalizeSettings() {
     const validCategories = new Set(data.categories.map((item) => item.id));
     const validModifiers = new Set(data.modifiers.map((item) => item.id));
-    const validPrompts = new Set(data.prompts.map((item) => item.id));
+    normalizeCustomData();
+    const validPrompts = new Set(getAllPrompts().map((item) => item.id));
 
     if (!state.settings || typeof state.settings !== "object" || Array.isArray(state.settings)) {
       state.settings = {};
@@ -138,6 +166,7 @@
       typeof state.settings.copyTemplate === "string" && core.hasPromptToken(state.settings.copyTemplate)
         ? state.settings.copyTemplate
         : DEFAULT_COPY_TEMPLATE;
+    state.settings.userName = typeof state.settings.userName === "string" ? state.settings.userName.trim().slice(0, 40) : "";
     state.settings.blockedTerms = core.parseBlockedTerms(state.settings.blockedTerms);
     state.settings.blockedPromptIds = Array.isArray(state.settings.blockedPromptIds)
       ? [...new Set(state.settings.blockedPromptIds.filter((id) => validPrompts.has(id)))]
@@ -145,6 +174,47 @@
 
     if (!Array.isArray(state.history)) state.history = [];
     if (!Array.isArray(state.favorites)) state.favorites = [];
+  }
+
+  function normalizeCustomData() {
+    const validCategories = new Set(data.categories.map((item) => item.id));
+    const validTypes = new Set(data.modifiers.map((item) => item.id));
+    const source = state.customData && typeof state.customData === "object" ? state.customData : {};
+    const seenPromptIds = new Set(data.prompts.map((item) => item.id));
+    const seenModifierIds = new Set();
+
+    const prompts = (Array.isArray(source.prompts) ? source.prompts : []).flatMap((item) => {
+      const text = typeof item?.text === "string" ? item.text.trim().slice(0, 500) : "";
+      const category = validCategories.has(item?.category) ? item.category : "";
+      if (!text || !category) return [];
+      let id = typeof item.id === "string" && item.id.startsWith("custom-prompt-") ? item.id : makeId("custom-prompt");
+      while (seenPromptIds.has(id)) id = makeId("custom-prompt");
+      seenPromptIds.add(id);
+      return [{
+        id,
+        category,
+        text,
+        tags: normalizeTags(item.tags),
+        custom: true,
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
+      }];
+    });
+
+    const modifiers = (Array.isArray(source.modifiers) ? source.modifiers : []).flatMap((item) => {
+      const value = typeof item?.value === "string" ? item.value.trim().slice(0, 200) : "";
+      if (!value || !validTypes.has(item?.typeId)) return [];
+      let id = typeof item.id === "string" && item.id.startsWith("custom-modifier-") ? item.id : makeId("custom-modifier");
+      while (seenModifierIds.has(id)) id = makeId("custom-modifier");
+      seenModifierIds.add(id);
+      return [{
+        id,
+        typeId: item.typeId,
+        value,
+        custom: true,
+        createdAt: typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString()
+      }];
+    });
+    state.customData = { prompts, modifiers };
   }
 
   function bindEvents() {
@@ -189,6 +259,15 @@
       button.addEventListener("click", () => insertTemplateToken(button.dataset.templateToken));
     });
 
+    elements.userNameInput.addEventListener("input", () => {
+      elements.userNameSaveState.textContent = "変更はまだ保存されていません。";
+    });
+    elements.saveUserNameButton.addEventListener("click", saveUserName);
+    elements.clearUserNameButton.addEventListener("click", () => {
+      elements.userNameInput.value = "";
+      saveUserName();
+    });
+
     elements.blockedTermsInput.addEventListener("input", () => {
       const draftTerms = core.parseBlockedTerms(elements.blockedTermsInput.value);
       updateBlockStats(draftTerms);
@@ -217,6 +296,15 @@
     elements.promptLibraryDialog.addEventListener("close", () => {
       document.body.classList.remove("dialog-open");
     });
+    elements.promptLibraryPromptTab.addEventListener("click", () => setLibraryMode("prompts"));
+    elements.promptLibraryModifierTab.addEventListener("click", () => setLibraryMode("modifiers"));
+
+    elements.customPromptForm.addEventListener("submit", registerCustomPrompt);
+    elements.customModifierForm.addEventListener("submit", registerCustomModifier);
+    elements.exportTextButton.addEventListener("click", exportTextList);
+    elements.exportJsonButton.addEventListener("click", exportJsonBackup);
+    elements.importJsonButton.addEventListener("click", () => elements.importJsonInput.click());
+    elements.importJsonInput.addEventListener("change", importJsonBackup);
 
     elements.resetSettingsButton.addEventListener("click", resetEverything);
   }
@@ -307,7 +395,22 @@
     elements.modifierCount.value = state.settings.modifierCount;
     elements.modifierRangeValue.textContent = state.settings.modifierCount;
     elements.templateSummaryState.textContent = "保存済み";
+    elements.userNameSummary.textContent = state.settings.userName || "未設定";
     updateBlockSummary();
+  }
+
+  function saveUserName() {
+    state.settings.userName = elements.userNameInput.value.trim().slice(0, 40);
+    elements.userNameInput.value = state.settings.userName;
+    elements.userNameSummary.textContent = state.settings.userName || "未設定";
+    elements.userNameSaveState.textContent = state.settings.userName
+      ? "この端末に保存しました。"
+      : "置き換えを解除しました。";
+    persistSettings();
+    renderCurrent();
+    renderSavedLists();
+    renderPromptLibraryIfOpen();
+    showStatus(state.settings.userName ? "表示名を保存した。" : "表示名の置き換えを解除した。", 1800);
   }
 
   function saveCopyTemplate(showFeedback) {
@@ -403,17 +506,19 @@
 
   function updateBlockStats(terms) {
     const prospective = { ...state.settings, blockedTerms: terms };
-    const blockedMain = data.prompts.filter((prompt) => getPromptBlockInfo(prompt, prospective).blocked).length;
-    const blockedExtra = data.modifiers.reduce(
+    const allPrompts = getAllPrompts();
+    const blockedMain = allPrompts.filter((prompt) => getPromptBlockInfo(prompt, prospective).blocked).length;
+    const blockedExtra = getAllModifiers().reduce(
       (total, modifier) => total + (modifier.values.length - getAllowedModifierValues(modifier, terms).length),
       0
     );
-    const remaining = data.prompts.length - blockedMain;
+    const remaining = allPrompts.length - blockedMain;
     elements.blockStats.textContent = `除外予定：メイン ${blockedMain}件・補助 ${blockedExtra}件／メイン残り ${remaining}件`;
   }
 
   function renderBlockedPromptList() {
     elements.blockedPromptList.replaceChildren();
+    const promptMap = new Map(getAllPrompts().map((prompt) => [prompt.id, prompt]));
     const prompts = state.settings.blockedPromptIds.map((id) => promptMap.get(id)).filter(Boolean);
 
     if (!prompts.length) {
@@ -428,7 +533,7 @@
       const item = document.createElement("div");
       item.className = "exact-block-item";
       const text = document.createElement("span");
-      text.textContent = prompt.text;
+      text.textContent = displayPromptText(prompt.text);
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.textContent = "×";
@@ -470,7 +575,7 @@
   }
 
   function getEligiblePrompts(settings = state.settings) {
-    return data.prompts.filter(
+    return getAllPrompts().filter(
       (prompt) => settings.categories.includes(prompt.category) && !getPromptBlockInfo(prompt, settings).blocked
     );
   }
@@ -517,7 +622,7 @@
   function rerollOneModifier(index) {
     const item = state.current?.modifiers[index];
     if (!item) return;
-    const source = modifierMap.get(item.typeId);
+    const source = getModifierById(item.typeId);
     if (!source) return;
     const allowed = getAllowedModifierValues(source);
     const candidates = allowed.filter((value) => value !== item.value);
@@ -525,7 +630,7 @@
       showStatus(`${item.label}は、地雷除外後の別候補がない。`, 2200);
       return;
     }
-    state.current.modifiers[index] = { ...item, value: randomItem(candidates) };
+    state.current.modifiers[index] = { ...item, value: randomItem(candidates), enabled: item.enabled !== false };
     renderCurrent();
     showStatus(`${item.label}だけ引き直した。`, 1500);
   }
@@ -539,7 +644,7 @@
 
   function pickModifiers() {
     const enabled = shuffle(
-      data.modifiers
+      getAllModifiers()
         .filter((modifier) => state.settings.modifiers.includes(modifier.id))
         .map((modifier) => ({ ...modifier, allowedValues: getAllowedModifierValues(modifier) }))
         .filter((modifier) => modifier.allowedValues.length)
@@ -549,7 +654,8 @@
     return enabled.slice(0, count).map((modifier) => ({
       typeId: modifier.id,
       label: modifier.label,
-      value: randomItem(modifier.allowedValues)
+      value: randomItem(modifier.allowedValues),
+      enabled: true
     }));
   }
 
@@ -560,7 +666,7 @@
 
     const category = categoryMap.get(state.current.main.category);
     elements.categoryBadge.textContent = category?.label || "その他";
-    elements.resultHeading.textContent = state.current.main.text;
+    elements.resultHeading.textContent = displayPromptText(state.current.main.text);
 
     elements.promptTags.replaceChildren();
     state.current.main.tags.forEach((tagText) => {
@@ -579,14 +685,28 @@
     } else {
       state.current.modifiers.forEach((modifier, index) => {
         const fragment = elements.modifierTemplate.content.cloneNode(true);
+        const card = fragment.querySelector(".modifier-card");
+        const toggle = fragment.querySelector(".modifier-card__copy-toggle");
+        const toggleState = fragment.querySelector(".modifier-card__copy-state");
+        const isEnabled = modifier.enabled !== false;
         fragment.querySelector(".modifier-card__label").textContent = modifier.label;
         fragment.querySelector(".modifier-card__value").textContent = modifier.value;
+        card.classList.toggle("is-copy-off", !isEnabled);
+        toggle.checked = isEnabled;
+        toggleState.textContent = isEnabled ? "コピーON" : "コピーOFF";
+        toggle.setAttribute("aria-label", `${modifier.label}をコピーへ反映`);
+        toggle.addEventListener("change", () => {
+          state.current.modifiers[index].enabled = toggle.checked;
+          renderCurrent();
+          showStatus(toggle.checked ? "この補助条件をコピーへ戻した。" : "この補助条件はコピーしない。", 1500);
+        });
         fragment.querySelector(".modifier-card__reroll").addEventListener("click", () => rerollOneModifier(index));
         elements.modifierList.append(fragment);
       });
     }
 
-    elements.modifierCountLabel.textContent = `${state.current.modifiers.length}件`;
+    const copyCount = state.current.modifiers.filter((item) => item.enabled !== false).length;
+    elements.modifierCountLabel.textContent = `${state.current.modifiers.length}件 / コピー${copyCount}`;
     updateFavoriteButton();
   }
 
@@ -638,15 +758,17 @@
     if (!saveCopyTemplate(false)) return;
 
     const category = categoryMap.get(state.current.main.category)?.label || "お題";
-    const extras = state.current.modifiers.length
-      ? state.current.modifiers.map((item) => `・${item.label}：${item.value}`).join("\n")
+    const enabledModifiers = state.current.modifiers.filter((item) => item.enabled !== false);
+    const extras = enabledModifiers.length
+      ? enabledModifiers.map((item) => `・${item.label}：${item.value}`).join("\n")
       : "指定なし";
     const tags = state.current.main.tags.map((tag) => `#${tag}`).join(" ");
     const text = core.formatTemplate(state.settings.copyTemplate, {
       "{{category}}": category,
-      "{{prompt}}": state.current.main.text,
+      "{{prompt}}": displayPromptText(state.current.main.text),
       "{{modifiers}}": extras,
-      "{{tags}}": tags
+      "{{tags}}": tags,
+      "{{user}}": state.settings.userName
     });
 
     try {
@@ -689,7 +811,8 @@
     items.forEach((item, index) => {
       const article = document.createElement("article");
       article.className = "saved-item";
-      const blocked = !item.main || getPromptBlockInfo(item.main).blocked;
+      const exists = item.main && getAllPrompts().some((prompt) => prompt.id === item.main.id);
+      const blocked = !exists || getPromptBlockInfo(item.main).blocked;
       article.classList.toggle("is-blocked", blocked);
 
       const loadButton = document.createElement("button");
@@ -698,7 +821,7 @@
       loadButton.disabled = blocked;
       loadButton.addEventListener("click", () => {
         const safeModifiers = (item.modifiers || []).filter((modifier) => {
-          const source = modifierMap.get(modifier.typeId);
+          const source = getModifierById(modifier.typeId);
           return source && getAllowedModifierValues(source).includes(modifier.value);
         });
         state.current = { main: structuredCloneSafe(item.main), modifiers: structuredCloneSafe(safeModifiers) };
@@ -714,7 +837,7 @@
 
       const text = document.createElement("span");
       text.className = "saved-item__text";
-      text.textContent = item.main?.text || "削除されたお題";
+      text.textContent = item.main ? displayPromptText(item.main.text) : "削除されたお題";
       loadButton.append(category, text);
 
       const deleteButton = document.createElement("button");
@@ -736,12 +859,36 @@
   }
 
   function renderPromptLibraryCategories() {
-    data.categories.forEach((category) => {
+    const current = elements.promptLibraryCategory.value || "all";
+    const items = state.libraryMode === "prompts" ? data.categories : data.modifiers;
+    elements.promptLibraryCategory.replaceChildren();
+    const allOption = document.createElement("option");
+    allOption.value = "all";
+    allOption.textContent = "すべて";
+    elements.promptLibraryCategory.append(allOption);
+    items.forEach((item) => {
       const option = document.createElement("option");
-      option.value = category.id;
-      option.textContent = category.label;
+      option.value = item.id;
+      option.textContent = item.label;
       elements.promptLibraryCategory.append(option);
     });
+    elements.promptLibraryCategory.value = items.some((item) => item.id === current) ? current : "all";
+    elements.promptLibraryCategoryLabel.textContent = state.libraryMode === "prompts" ? "分類" : "条件の種類";
+  }
+
+  function setLibraryMode(mode) {
+    if (!['prompts', 'modifiers'].includes(mode) || state.libraryMode === mode) return;
+    state.libraryMode = mode;
+    elements.promptLibrarySearch.value = "";
+    elements.promptLibraryStatus.value = "all";
+    elements.promptLibraryPromptTab.classList.toggle("is-active", mode === "prompts");
+    elements.promptLibraryModifierTab.classList.toggle("is-active", mode === "modifiers");
+    elements.promptLibraryPromptTab.setAttribute("aria-selected", String(mode === "prompts"));
+    elements.promptLibraryModifierTab.setAttribute("aria-selected", String(mode === "modifiers"));
+    elements.promptLibraryEyebrow.textContent = mode === "prompts" ? "ALL MAIN PROMPTS" : "ALL EXTRA CONDITIONS";
+    elements.promptLibrarySearch.placeholder = mode === "prompts" ? "本文・タグから検索" : "条件本文から検索";
+    renderPromptLibraryCategories();
+    renderPromptLibrary();
   }
 
   function openPromptLibrary() {
@@ -776,10 +923,16 @@
     const categoryFilter = elements.promptLibraryCategory.value;
     const statusFilter = elements.promptLibraryStatus.value;
 
-    const results = data.prompts.filter((prompt) => {
+    if (state.libraryMode === "modifiers") {
+      renderModifierLibrary(query, categoryFilter, statusFilter, previousScroll);
+      return;
+    }
+
+    const allPrompts = getAllPrompts();
+    const results = allPrompts.filter((prompt) => {
       const category = categoryMap.get(prompt.category)?.label || "";
       const info = getPromptBlockInfo(prompt);
-      const searchable = core.normalizeText([category, prompt.text, ...(prompt.tags || [])].join(" "));
+      const searchable = core.normalizeText([category, prompt.text, displayPromptText(prompt.text), ...(prompt.tags || [])].join(" "));
       if (query && !searchable.includes(query)) return false;
       if (categoryFilter !== "all" && prompt.category !== categoryFilter) return false;
       if (statusFilter === "eligible" && info.blocked) return false;
@@ -787,7 +940,7 @@
       return true;
     });
 
-    elements.promptLibraryResultCount.textContent = `該当 ${results.length}件 / 全${data.prompts.length}件`;
+    elements.promptLibraryResultCount.textContent = `該当 ${results.length}件 / 全${allPrompts.length}件`;
     elements.promptLibraryList.replaceChildren();
 
     if (!results.length) {
@@ -821,11 +974,12 @@
     status.className = `library-state${info.blocked ? " library-state--blocked" : ""}`;
     status.textContent = info.blocked ? "抽選から除外中" : "地雷なし";
     badges.append(category, status);
+    if (prompt.custom) badges.append(createCustomBadge());
     topLine.append(badges);
 
     const text = document.createElement("p");
     text.className = "library-item__text";
-    text.textContent = prompt.text;
+    text.textContent = displayPromptText(prompt.text);
 
     article.append(topLine, text);
 
@@ -863,9 +1017,94 @@
     blockButton.textContent = info.exact ? "個別除外を解除" : "このお題を除外";
     blockButton.addEventListener("click", () => togglePromptBlock(prompt));
     actions.append(loadButton, blockButton);
+    if (prompt.custom) actions.append(createDeleteButton(() => deleteCustomPrompt(prompt)));
 
     article.append(tags, actions);
     return article;
+  }
+
+  function renderModifierLibrary(query, typeFilter, statusFilter, previousScroll) {
+    const values = getAllModifierEntries();
+    const results = values.filter((entry) => {
+      const matchedTerms = core.findMatchingTerms(`${entry.label} ${entry.value}`, state.settings.blockedTerms);
+      const blocked = matchedTerms.length > 0;
+      const searchable = core.normalizeText(`${entry.label} ${entry.value}`);
+      if (query && !searchable.includes(query)) return false;
+      if (typeFilter !== "all" && entry.typeId !== typeFilter) return false;
+      if (statusFilter === "eligible" && blocked) return false;
+      if (statusFilter === "blocked" && !blocked) return false;
+      return true;
+    });
+
+    elements.promptLibraryResultCount.textContent = `該当 ${results.length}件 / 全${values.length}件`;
+    elements.promptLibraryList.replaceChildren();
+    if (!results.length) {
+      const empty = document.createElement("p");
+      empty.className = "library-empty";
+      empty.textContent = "条件に合う補助条件はありません。";
+      elements.promptLibraryList.append(empty);
+      return;
+    }
+    results.forEach((entry) => elements.promptLibraryList.append(createModifierLibraryItem(entry)));
+    window.requestAnimationFrame(() => {
+      elements.promptLibraryList.scrollTop = previousScroll;
+    });
+  }
+
+  function createModifierLibraryItem(entry) {
+    const matchedTerms = core.findMatchingTerms(`${entry.label} ${entry.value}`, state.settings.blockedTerms);
+    const article = document.createElement("article");
+    article.className = "library-item";
+    article.classList.toggle("is-blocked", matchedTerms.length > 0);
+
+    const topLine = document.createElement("div");
+    topLine.className = "library-item__topline";
+    const badges = document.createElement("div");
+    badges.className = "library-item__badges";
+    const type = document.createElement("span");
+    type.className = "library-category";
+    type.textContent = entry.label;
+    const status = document.createElement("span");
+    status.className = `library-state${matchedTerms.length ? " library-state--blocked" : ""}`;
+    status.textContent = matchedTerms.length ? "抽選から除外中" : "地雷なし";
+    badges.append(type, status);
+    if (entry.custom) badges.append(createCustomBadge());
+    topLine.append(badges);
+
+    const text = document.createElement("p");
+    text.className = "library-item__text";
+    text.textContent = entry.value;
+    article.append(topLine, text);
+
+    if (matchedTerms.length) {
+      const reason = document.createElement("p");
+      reason.className = "library-item__reason";
+      reason.textContent = `地雷ワード：${matchedTerms.join("、")}`;
+      article.append(reason);
+    }
+    if (entry.custom) {
+      const actions = document.createElement("div");
+      actions.className = "library-item__actions";
+      actions.append(createDeleteButton(() => deleteCustomModifier(entry)));
+      article.append(actions);
+    }
+    return article;
+  }
+
+  function createCustomBadge() {
+    const badge = document.createElement("span");
+    badge.className = "library-custom-badge";
+    badge.textContent = "自分で追加";
+    return badge;
+  }
+
+  function createDeleteButton(onDelete) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "library-action-button library-action-button--danger";
+    button.textContent = "登録を削除";
+    button.addEventListener("click", onDelete);
+    return button;
   }
 
   function loadPromptFromLibrary(prompt) {
@@ -888,6 +1127,198 @@
     }
   }
 
+  function renderRegistrationOptions() {
+    elements.customPromptCategory.replaceChildren();
+    data.categories.forEach((category) => {
+      const option = document.createElement("option");
+      option.value = category.id;
+      option.textContent = category.label;
+      elements.customPromptCategory.append(option);
+    });
+    elements.customModifierType.replaceChildren();
+    data.modifiers.forEach((modifier) => {
+      const option = document.createElement("option");
+      option.value = modifier.id;
+      option.textContent = modifier.label;
+      elements.customModifierType.append(option);
+    });
+  }
+
+  function registerCustomPrompt(event) {
+    event.preventDefault();
+    const text = elements.customPromptText.value.trim().slice(0, 500);
+    const category = elements.customPromptCategory.value;
+    if (!text || !categoryMap.has(category)) return;
+    const duplicate = getAllPrompts().some(
+      (prompt) => prompt.category === category && core.normalizeText(prompt.text) === core.normalizeText(text)
+    );
+    if (duplicate) {
+      elements.dataManagerState.textContent = "同じ種類に、同じ本文のお題がすでにあります。";
+      return;
+    }
+    state.customData.prompts.push({
+      id: makeId("custom-prompt"),
+      category,
+      text,
+      tags: normalizeTags(elements.customPromptTags.value.split(/[、,]/)),
+      custom: true,
+      createdAt: new Date().toISOString()
+    });
+    persistCustomData();
+    elements.customPromptForm.reset();
+    renderAfterDataChange();
+    elements.dataManagerState.textContent = "メインお題を登録しました。";
+    showStatus("新しいメインお題を抽選へ追加した。", 2000);
+  }
+
+  function registerCustomModifier(event) {
+    event.preventDefault();
+    const value = elements.customModifierValue.value.trim().slice(0, 200);
+    const typeId = elements.customModifierType.value;
+    if (!value || !getModifierById(typeId)) return;
+    const duplicate = getAllModifierEntries().some(
+      (entry) => entry.typeId === typeId && core.normalizeText(entry.value) === core.normalizeText(value)
+    );
+    if (duplicate) {
+      elements.dataManagerState.textContent = "同じ種類に、同じ補助条件がすでにあります。";
+      return;
+    }
+    state.customData.modifiers.push({
+      id: makeId("custom-modifier"),
+      typeId,
+      value,
+      custom: true,
+      createdAt: new Date().toISOString()
+    });
+    persistCustomData();
+    elements.customModifierForm.reset();
+    renderAfterDataChange();
+    elements.dataManagerState.textContent = "補助条件を登録しました。";
+    showStatus("新しい補助条件を抽選へ追加した。", 2000);
+  }
+
+  function deleteCustomPrompt(prompt) {
+    if (!window.confirm("この自作メインお題を削除しますか？")) return;
+    state.customData.prompts = state.customData.prompts.filter((item) => item.id !== prompt.id);
+    state.settings.blockedPromptIds = state.settings.blockedPromptIds.filter((id) => id !== prompt.id);
+    if (state.current?.main?.id === prompt.id) state.current = null;
+    persistCustomData();
+    persistSettings();
+    renderAfterDataChange();
+    if (!state.current) rollAll(false);
+    showLibraryMessage("自作メインお題を削除しました。", 2200);
+  }
+
+  function deleteCustomModifier(entry) {
+    if (!window.confirm("この自作補助条件を削除しますか？")) return;
+    state.customData.modifiers = state.customData.modifiers.filter((item) => item.id !== entry.id);
+    if (state.current) {
+      state.current.modifiers = state.current.modifiers.filter(
+        (item) => !(item.typeId === entry.typeId && item.value === entry.value)
+      );
+    }
+    persistCustomData();
+    renderAfterDataChange();
+    renderCurrent();
+    showLibraryMessage("自作補助条件を削除しました。", 2200);
+  }
+
+  function renderAfterDataChange() {
+    renderDataCounts();
+    renderBlockSettings();
+    renderSavedLists();
+    renderPromptLibraryIfOpen();
+  }
+
+  function exportTextList() {
+    const lines = [
+      "Prompt Roulette お題・補助条件一覧",
+      `出力日時：${new Date().toLocaleString("ja-JP")}`,
+      "",
+      `メインお題：${getAllPrompts().length}件`,
+      `補助条件：${countModifierValues()}件`,
+      ""
+    ];
+    data.categories.forEach((category) => {
+      lines.push(`## ${category.label}`);
+      getAllPrompts()
+        .filter((prompt) => prompt.category === category.id)
+        .forEach((prompt) => lines.push(`- ${displayPromptText(prompt.text)}${prompt.custom ? " [自分で追加]" : ""}`));
+      lines.push("");
+    });
+    lines.push("# 補助条件", "");
+    getAllModifiers().forEach((modifier) => {
+      lines.push(`## ${modifier.label}`);
+      const customValues = new Set(
+        state.customData.modifiers.filter((item) => item.typeId === modifier.id).map((item) => item.value)
+      );
+      modifier.values.forEach((value) => lines.push(`- ${value}${customValues.has(value) ? " [自分で追加]" : ""}`));
+      lines.push("");
+    });
+    downloadFile(`prompt-roulette-list-${dateStamp()}.txt`, lines.join("\n"), "text/plain;charset=utf-8");
+    elements.dataManagerState.textContent = "お題・補助条件の一覧をTXTで出力しました。";
+  }
+
+  function exportJsonBackup() {
+    const backup = {
+      format: "prompt-roulette-export",
+      formatVersion: 1,
+      appVersion: data.version,
+      exportedAt: new Date().toISOString(),
+      customData: structuredCloneSafe(state.customData),
+      lists: {
+        categories: structuredCloneSafe(data.categories),
+        prompts: structuredCloneSafe(getAllPrompts()),
+        modifiers: structuredCloneSafe(getAllModifiers())
+      }
+    };
+    downloadFile(
+      `prompt-roulette-backup-${dateStamp()}.json`,
+      JSON.stringify(backup, null, 2),
+      "application/json;charset=utf-8"
+    );
+    elements.dataManagerState.textContent = "追加データを含むJSONバックアップを出力しました。";
+  }
+
+  async function importJsonBackup(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const backup = JSON.parse(await file.text());
+      if (backup?.format !== "prompt-roulette-export" || !backup.customData) throw new Error("invalid-format");
+      const previous = structuredCloneSafe(state.customData);
+      state.customData = backup.customData;
+      normalizeCustomData();
+      const imported = state.customData;
+      state.customData = mergeCustomData(previous, imported);
+      persistCustomData();
+      renderAfterDataChange();
+      elements.dataManagerState.textContent = `JSONから復元しました（メイン ${imported.prompts.length}件・補助 ${imported.modifiers.length}件）。`;
+      showStatus("バックアップから追加データを復元した。", 2200);
+    } catch (error) {
+      elements.dataManagerState.textContent = "このファイルはPrompt Rouletteのバックアップとして読み込めません。";
+    }
+  }
+
+  function mergeCustomData(base, incoming) {
+    const prompts = [...base.prompts];
+    incoming.prompts.forEach((item) => {
+      const duplicate = prompts.some(
+        (saved) => saved.category === item.category && core.normalizeText(saved.text) === core.normalizeText(item.text)
+      );
+      if (!duplicate) prompts.push({ ...item, id: makeId("custom-prompt") });
+    });
+    const modifiers = [...base.modifiers];
+    incoming.modifiers.forEach((item) => {
+      const duplicate = modifiers.some(
+        (saved) => saved.typeId === item.typeId && core.normalizeText(saved.value) === core.normalizeText(item.value)
+      );
+      if (!duplicate) modifiers.push({ ...item, id: makeId("custom-modifier") });
+    });
+    return { prompts, modifiers };
+  }
+
   function resetEverything() {
     const confirmed = window.confirm("抽選設定・コピー文・地雷リスト・履歴・お気に入りをすべて初期化しますか？");
     if (!confirmed) return;
@@ -896,6 +1327,7 @@
     state.history = [];
     state.favorites = [];
     elements.copyTemplateInput.value = state.settings.copyTemplate;
+    elements.userNameInput.value = "";
     elements.blockedTermsInput.value = "";
     persistSettings();
     persistList(storageKeys.history, state.history);
@@ -908,6 +1340,7 @@
     renderPromptLibraryIfOpen();
     rollAll(false);
     elements.templateSaveState.textContent = "";
+    elements.userNameSaveState.textContent = "";
     elements.blockSaveState.textContent = "";
     showStatus("初期状態に戻した。", 1800);
   }
@@ -922,7 +1355,7 @@
 
   function makeSignature(value) {
     const extras = (value.modifiers || [])
-      .map((item) => `${item.typeId}:${item.value}`)
+      .map((item) => `${item.typeId}:${item.value}:${item.enabled === false ? "off" : "on"}`)
       .sort()
       .join("|");
     return `${value.main?.id || "missing"}::${extras}`;
@@ -950,6 +1383,10 @@
     } catch (error) {
       // 保存できない環境でも、開いている間の抽選は続けられる。
     }
+  }
+
+  function persistCustomData() {
+    persistList(storageKeys.customData, state.customData);
   }
 
   function loadJson(key, fallback) {
@@ -983,7 +1420,85 @@
   }
 
   function countModifierValues() {
-    return data.modifiers.reduce((total, modifier) => total + modifier.values.length, 0);
+    return getAllModifiers().reduce((total, modifier) => total + modifier.values.length, 0);
+  }
+
+  function getAllPrompts() {
+    return [...data.prompts, ...state.customData.prompts];
+  }
+
+  function getAllModifiers() {
+    const extrasByType = new Map(data.modifiers.map((modifier) => [modifier.id, []]));
+    state.customData.modifiers.forEach((item) => extrasByType.get(item.typeId)?.push(item.value));
+    return data.modifiers.map((modifier) => ({
+      ...modifier,
+      values: [...modifier.values, ...(extrasByType.get(modifier.id) || [])]
+    }));
+  }
+
+  function getAllModifierEntries() {
+    const customByKey = new Map(
+      state.customData.modifiers.map((item) => [`${item.typeId}\u0000${item.value}`, item])
+    );
+    return getAllModifiers().flatMap((modifier) =>
+      modifier.values.map((value) => {
+        const custom = customByKey.get(`${modifier.id}\u0000${value}`);
+        return {
+          id: custom?.id || `${modifier.id}-${value}`,
+          typeId: modifier.id,
+          label: modifier.label,
+          value,
+          custom: Boolean(custom)
+        };
+      })
+    );
+  }
+
+  function getModifierById(id) {
+    return getAllModifiers().find((modifier) => modifier.id === id);
+  }
+
+  function displayPromptText(text) {
+    const value = String(text || "");
+    return state.settings.userName ? value.replaceAll("ユーザー", state.settings.userName) : value;
+  }
+
+  function renderDataCounts() {
+    const promptCount = getAllPrompts().length;
+    const modifierCount = countModifierValues();
+    elements.headerPromptCount.textContent = promptCount;
+    elements.dataCount.textContent = `${promptCount} MAIN / ${modifierCount} EXTRA`;
+    elements.libraryPromptTabCount.textContent = promptCount;
+    elements.libraryModifierTabCount.textContent = modifierCount;
+    elements.customDataCount.textContent = `追加 ${state.customData.prompts.length + state.customData.modifiers.length}件`;
+  }
+
+  function normalizeTags(tags) {
+    const values = Array.isArray(tags) ? tags : [];
+    return [...new Set(values.map((tag) => String(tag).trim().slice(0, 40)).filter(Boolean))].slice(0, 12);
+  }
+
+  function makeId(prefix) {
+    const random = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return `${prefix}-${random}`;
+  }
+
+  function dateStamp() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function downloadFile(filename, content, type) {
+    const blob = new Blob(type.startsWith("text/plain") ? ["\ufeff", content] : [content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   function structuredCloneSafe(value) {
