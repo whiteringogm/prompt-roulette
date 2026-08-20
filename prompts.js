@@ -1,5 +1,5 @@
 window.PROMPT_DATA = {
-  version: "0.2.0",
+  version: "0.3.0",
   categories: [
     { id: "roleplay", label: "ロールプレイ設定" },
     { id: "incident", label: "事件・第三者" },
