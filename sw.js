@@ -1,5 +1,5 @@
-const CACHE_NAME = "prompt-roulette-v0.1.0";
-const APP_SHELL = ["./", "./index.html", "./styles.css", "./prompts.js", "./app.js", "./manifest.webmanifest", "./icon.svg"];
+const CACHE_NAME = "prompt-roulette-v0.2.0";
+const APP_SHELL = ["./", "./index.html", "./styles.css", "./prompts.js", "./core.js", "./app.js", "./manifest.webmanifest", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
